@@ -727,27 +727,45 @@
     return str;
   }
 
+  function parseDate(d) {
+    if (!d) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      const [y, m, day] = d.split('-');
+      return new Date(Number(y), Number(m) - 1, Number(day));
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) {
+      const [day, m, y] = d.split('/');
+      return new Date(Number(y), Number(m) - 1, Number(day));
+    }
+    if (/^\d{10,13}$/.test(String(d))) {
+      const ts = String(d).length === 10 ? Number(d) * 1000 : Number(d);
+      return new Date(ts);
+    }
+    const dt = new Date(d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
   function fmtDate(d) {
     if (!d) return '—';
-    try {
-      const dt = new Date(d);
-      return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    } catch { return d; }
+    const dt = parseDate(d);
+    if (!dt) return String(d);
+    return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   function fmtDateShort(d) {
     if (!d) return '—';
-    try {
-      const dt = new Date(d);
-      return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-    } catch { return d; }
+    const dt = parseDate(d);
+    if (!dt) return String(d);
+    return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   }
 
   function calcDuration(start, end) {
     if (!start) return null;
-    const s = new Date(start);
-    const e = end ? new Date(end) : new Date();
+    const s = parseDate(start);
+    const e = end ? parseDate(end) : new Date();
+    if (!s || !e || isNaN(s) || isNaN(e)) return null;
     const days = Math.floor((e - s) / (1000 * 60 * 60 * 24));
+    if (days < 0) return null;
     if (days < 30) return `${days} dias`;
     if (days < 365) return `${Math.floor(days / 30)} meses`;
     const y = Math.floor(days / 365);
@@ -826,12 +844,15 @@
       query: {
         bool: {
           should: [
+            { term: { "numeroProcesso.keyword": numero } },
+            { term: { "numeroProcesso.keyword": numeroLimpo } },
             { match: { "numeroProcesso": numero } },
             { match: { "numeroProcesso": numeroLimpo } }
           ],
           minimum_should_match: 1
         }
-      }
+      },
+      _source: true
     };
 
     // Use local proxy to avoid CORS
@@ -912,7 +933,7 @@ Se não encontrar nada relevante, retorne {"resultados": [], "resumo": "Nenhuma 
     const ultimoMov = movimentos[0];
 
     // Partes
-    const partes = p.partes || [];
+    const partes = p.partes || p.polo || [];
 
     // Assuntos
     const assuntos = p.assuntos || [];
@@ -1046,7 +1067,7 @@ Se não encontrar nada relevante, retorne {"resultados": [], "resumo": "Nenhuma 
               <div class="info-value" style="margin-top:4px;font-size:16px">${escHtml(ultimoMov.nome || '—')}</div>
               ${ultimoMov.complementosTabelados?.length ? `
               <div style="margin-top:6px;font-size:12px;color:var(--slate)">
-                ${ultimoMov.complementosTabelados.map(c => escHtml(c.descricao || c.valor || '')).join(' · ')}
+                ${ultimoMov.complementosTabelados.map(c => { const txt = c.descricao || c.nome || c.valor || ''; return escHtml(txt.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())); }).join(' · ')}
               </div>` : ''}
             </div>
           </div>
@@ -1103,7 +1124,7 @@ Se não encontrar nada relevante, retorne {"resultados": [], "resumo": "Nenhuma 
                     <div class="movement-name">${escHtml(mov.nome || '—')}</div>
                     ${mov.complementosTabelados?.length ? `
                     <div class="movement-comp">
-                      ${mov.complementosTabelados.map(c => escHtml(c.descricao || c.valor || c.nome || '')).join(' · ')}
+                      ${mov.complementosTabelados.map(c => { const txt = c.descricao || c.nome || c.valor || ''; return escHtml(txt.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())); }).join(' · ')}
                     </div>` : ''}
                   </div>
                 </div>
