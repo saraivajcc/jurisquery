@@ -819,10 +819,9 @@
   }
 
   async function queryDatajud(numero, tribunal, apiKey) {
-    const url = `https://api-publica.datajud.cnj.jus.br/api_publica_${tribunal}/_search`;
     const numeroLimpo = normalizeNumero(numero);
 
-    const body = {
+    const queryBody = {
       size: 1,
       query: {
         bool: {
@@ -835,13 +834,15 @@
       }
     };
 
-    const res = await fetch(url, {
+    // Use local proxy to avoid CORS
+    const res = await fetch('/api/datajud', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `APIKey ${apiKey}`
-      },
-      body: JSON.stringify(body)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tribunal,
+        apiKey,
+        body: queryBody
+      })
     });
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
